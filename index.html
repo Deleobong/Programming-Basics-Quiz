@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Programming Basics Quiz</title>
+<style>
+:root{
+  --bg:#F4F1E8;--surface:#FFFFFF;--ink:#1D2433;--muted:#5E6676;--line:#D6D1C2;
+  --brand:#1F4FD8;--brand-ink:#FFFFFF;--pick:#EAF0FF;--ok:#16794C;--danger:#B3261E;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:640px;margin:0 auto;padding:28px 18px 48px}
+h1{font-size:clamp(1.6rem,4vw,2.1rem);margin:0 0 4px;letter-spacing:-.01em}
+.sub{margin:0 0 20px;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px}
+.top{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:.92rem;margin-bottom:8px}
+.bar{height:8px;background:var(--bg);border-radius:99px;overflow:hidden;margin-bottom:20px}
+.bar i{display:block;height:100%;width:0;background:var(--brand);transition:width .25s}
+h2{font-size:1.25rem;line-height:1.35;margin:0 0 16px}
+.opts{display:grid;gap:10px;margin:0;padding:0;border:0}
+.opt{display:block}
+.opt input{position:absolute;opacity:0;pointer-events:none}
+.opt span{display:flex;gap:12px;align-items:center;border:1.5px solid var(--line);border-radius:10px;padding:12px 14px;cursor:pointer;background:var(--bg)}
+.opt b{flex:none;width:28px;height:28px;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;font-size:.85rem;background:var(--surface)}
+.opt input:checked+span{border-color:var(--brand);background:var(--pick)}
+.opt input:checked+span b{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.opt input:focus-visible+span{outline:3px solid var(--brand);outline-offset:1px}
+.msg{color:var(--danger);font-weight:600;min-height:1.4em;margin:12px 0 0}
+.actions{display:flex;justify-content:flex-end;margin-top:8px}
+button{font:600 1rem inherit;font-family:inherit;border-radius:8px;padding:11px 22px;cursor:pointer;border:1.5px solid var(--brand);background:var(--brand);color:var(--brand-ink)}
+button:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+.score{font-size:3.2rem;font-weight:800;line-height:1;margin:6px 0}
+.result p{margin:6px 0}
+.pct{color:var(--muted)}
+.final{font-size:1.15rem;font-weight:600;margin:14px 0 18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Programming basics quiz</h1>
+  <p class="sub">Pick one answer for each question, then move to the next.</p>
+
+  <div class="card" id="quiz">
+    <div class="top"><span id="num"></span><span id="soFar"></span></div>
+    <div class="bar"><i id="fill"></i></div>
+    <h2 id="question"></h2>
+    <fieldset class="opts" id="options" style="min-width:0"></fieldset>
+    <p class="msg" id="msg" role="alert"></p>
+    <div class="actions"><button id="next" type="button">Next question</button></div>
+  </div>
+
+  <div class="card result" id="result" hidden>
+    <div class="pct">Your score</div>
+    <div class="score" id="score"></div>
+    <p class="pct" id="percent"></p>
+    <p class="final" id="message"></p>
+    <button id="again" type="button">Try again</button>
+  </div>
+</div>
+
+<script>
+// Each question is an object: the text, four options, and the index of the correct option.
+var questions = [
+  { q: "Which keyword is used to declare a variable that can change in JavaScript?",
+    options: ["let", "const", "fixed", "static"], answer: 0 },
+  { q: "What does the === operator do?",
+    options: ["Assigns a value", "Compares value and type", "Adds two numbers", "Checks only the length"], answer: 1 },
+  { q: "Which array method adds an item to the end of an array?",
+    options: ["pop()", "shift()", "push()", "slice()"], answer: 2 },
+  { q: "What will console.log(typeof 42) print?",
+    options: ["string", "boolean", "object", "number"], answer: 3 },
+  { q: "Which loop is best when you know how many times to repeat?",
+    options: ["for loop", "if statement", "switch statement", "try block"], answer: 0 },
+  { q: "What does HTML stand for?",
+    options: ["Hyper Trainer Marking Language", "HyperText Markup Language", "High Text Machine Language", "HyperText Making Logic"], answer: 1 },
+  { q: "Which CSS property changes the text colour of an element?",
+    options: ["font-style", "background", "color", "text-size"], answer: 2 }
+];
+
+var current = 0;        // index of the question on screen
+var score = 0;          // number of correct answers
+var picked = -1;        // option chosen for the current question (-1 = none)
+var letters = ["A", "B", "C", "D"];
+
+var el = {
+  quiz: document.getElementById("quiz"), result: document.getElementById("result"),
+  num: document.getElementById("num"), soFar: document.getElementById("soFar"), fill: document.getElementById("fill"),
+  question: document.getElementById("question"), options: document.getElementById("options"),
+  msg: document.getElementById("msg"), next: document.getElementById("next")
+};
+
+function esc(t) { var d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
+
+function showQuestion() {
+  var item = questions[current];
+  picked = -1;
+  el.msg.textContent = "";
+  el.num.textContent = "Question " + (current + 1) + " of " + questions.length;
+  el.soFar.textContent = "Score so far: " + score;
+  el.fill.style.width = (current / questions.length * 100) + "%";
+  el.question.textContent = item.q;
+  el.next.textContent = (current === questions.length - 1) ? "Finish quiz" : "Next question";
+
+  var html = "<legend style=\"position:absolute;opacity:0\">Choose one answer</legend>";
+  for (var i = 0; i < item.options.length; i++) {
+    html += "<label class=\"opt\"><input type=\"radio\" name=\"answer\" value=\"" + i + "\"><span><b>" + letters[i] + "</b>" + esc(item.options[i]) + "</span></label>";
+  }
+  el.options.innerHTML = html;
+}
+
+el.options.addEventListener("change", function (e) {
+  picked = Number(e.target.value);
+  el.msg.textContent = "";
+});
+
+el.next.addEventListener("click", function () {
+  if (picked === -1) { el.msg.textContent = "Select an answer to continue."; return; }
+  if (picked === questions[current].answer) { score++; }
+  current++;
+  if (current < questions.length) { showQuestion(); } else { showResult(); }
+});
+
+function getMessage(percent) {
+  if (percent === 100) { return "Perfect score! Outstanding work."; }
+  if (percent >= 70) { return "Great job! You know your basics well."; }
+  if (percent >= 50) { return "Good effort. A little more practice will get you there."; }
+  return "Keep practising. Review the topics and try again.";
+}
+
+function showResult() {
+  var percent = Math.round(score / questions.length * 100);
+  el.quiz.hidden = true;
+  document.getElementById("score").textContent = score + " / " + questions.length;
+  document.getElementById("percent").textContent = percent + "% correct";
+  document.getElementById("message").textContent = getMessage(percent);
+  el.result.hidden = false;
+}
+
+document.getElementById("again").addEventListener("click", function () {
+  current = 0; score = 0;
+  el.result.hidden = true;
+  el.quiz.hidden = false;
+  showQuestion();
+});
+
+showQuestion();
+</script>
+</body>
+</html>
